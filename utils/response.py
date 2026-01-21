@@ -20,12 +20,18 @@ def set_cookie(headers, key, value, path="/", http_only=True):
 def clear_cookie(headers, key, path="/"):
     headers.append(("Set-Cookie", f"{key}=; Path={path}; Max-Age=0"))
 
-def render_template(name: str, context: dict):
+def _load_template(name: str) -> str:
     base_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
     with open(os.path.join(base_dir, name), "r", encoding="utf-8") as f:
-        html = f.read()
+        return f.read()
 
+def render_page(body_template: str, context: dict):
+    body_html = _load_template(body_template)
     for k, v in context.items():
-        html = html.replace("{{ " + k + " }}", str(v))
+        body_html = body_html.replace("{{ " + k + " }}", str(v))
 
-    return html
+    layout = _load_template("layout.html")
+    page = layout.replace("{{ body }}", body_html)
+    page = page.replace("{{ title }}", str(context.get("title", "Hackathon Portal")))
+    page = page.replace("{{ extra_head }}", str(context.get("extra_head", "")))
+    return page

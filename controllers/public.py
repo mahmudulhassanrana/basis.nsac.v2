@@ -1,31 +1,69 @@
+import json
 from db.database import query_one, execute
 from auth.security import hash_password, verify_password, sign
 from auth.sessions import create_session, destroy_session
-from utils.response import response, redirect, render_template, set_cookie, clear_cookie, text
-from utils.request import parse_form
+from utils.response import (
+    response,
+    redirect,
+    render_page,
+    set_cookie,
+    clear_cookie,
+)
+from utils.request import parse_form, parse_cookies
 
+
+# =========================
+# HOME
+# =========================
 def home(req):
-    html = render_template("home.html", {"title": "Hackathon Portal"})
-    return response(html.encode())
+    html = render_page(
+        "home.html",
+        {
+            "title": "Hackathon Portal",
+        },
+    )
+    return response(html.encode("utf-8"))
 
+
+# =========================
+# LOGIN
+# =========================
 def login_get(req):
-    html = render_template("login.html", {"error": ""})
-    return response(html.encode())
+    html = render_page(
+        "login.html",
+        {
+            "title": "Login",
+            "error": "",
+        },
+    )
+    return response(html.encode("utf-8"))
+
 
 def login_post(req):
     data, _ = parse_form(req["environ"])
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
 
-    user = query_one("SELECT * FROM users WHERE email=%s AND status='active'", (email,))
+    user = query_one(
+        "SELECT * FROM users WHERE email=%s AND status='active'",
+        (email,),
+    )
+
     if not user or not verify_password(password, user["password_hash"]):
-        html = render_template("login.html", {"error": "Invalid email or password"})
-        return response(html.encode(), status="401 Unauthorized")
+        html = render_page(
+            "login.html",
+            {
+                "title": "Login",
+                "error": "Invalid email or password",
+            },
+        )
+        return response(html.encode("utf-8"), status="401 Unauthorized")
 
     token = create_session(user["id"])
     headers = []
     set_cookie(headers, "session", sign(token))
-    # redirect by role
+
+    # Redirect by role
     role = user["role"]
     if role == "admin":
         return "302 Found", headers + [("Location", "/admin/dashboard")], [b""]
@@ -35,43 +73,108 @@ def login_post(req):
         return "302 Found", headers + [("Location", "/volunteer/dashboard")], [b""]
     return "302 Found", headers + [("Location", "/participant/dashboard")], [b""]
 
+
+# =========================
+# REGISTER (FULL PROCESS)
+# =========================
 def register_get(req):
-    html = render_template("register.html", {"error": ""})
-    return response(html.encode())
+    html = render_page(
+        "register.html",
+        {
+            "title": "Participant Registration",
+            "error": "",
+        },
+    )
+    return response(html.encode("utf-8"))
+
 
 def register_post(req):
     data, _ = parse_form(req["environ"])
-    name = (data.get("name") or "").strip()
+
+    team_name = (data.get("team_name") or "").strip()
+    location = (data.get("location") or "").strip()
+    university = (data.get("university") or "").strip()
+    leader_name = (data.get("leader_name") or "").strip()
+    leader_mobile = (data.get("leader_mobile") or "").strip()
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
-    role = (data.get("role") or "participant").strip()
 
-    if role not in ("participant", "judge", "volunteer"):
-        role = "participant"  # only admin can create admin
+    # Validation
+    if not all(
+        [
+            team_name,
+            location,
+            university,
+            leader_name,
+            leader_mobile,
+            email,
+            password,
+        ]
+    ):
+        html = render_page(
+            "register.html",
+            {
+                "title": "Participant Registration",
+                "error": "All fields are required.",
+            },
+        )
+        return response(html.encode("utf-8"), status="400 Bad Request")
 
-    if not name or not email or not password:
-        html = render_template("register.html", {"error": "All fields are required"})
-        return response(html.encode(), status="400 Bad Request")
+    if len(password) < 6:
+        html = render_page(
+            "register.html",
+            {
+                "title": "Participant Registration",
+                "error": "Password must be at least 6 characters.",
+            },
+        )
+        return response(html.encode("utf-8"), status="400 Bad Request")
 
     exists = query_one("SELECT id FROM users WHERE email=%s", (email,))
     if exists:
-        html = render_template("register.html", {"error": "Email already registered"})
-        return response(html.encode(), status="409 Conflict")
+        html = render_page(
+            "register.html",
+            {
+                "title": "Participant Registration",
+                "error": "This email is already registered.",
+            },
+        )
+        return response(html.encode("utf-8"), status="409 Conflict")
+
+    # 1) Create participant user
+    user_id = execute(
+        "INSERT INTO users (name,email,password_hash,role) VALUES (%s,%s,%s,'participant')",
+        (leader_name, email, hash_password(password)),
+    )
+
+    # 2) Create participant application (pending)
+    application_data = {
+        "team_name": team_name,
+        "location": location,
+        "university": university,
+        "leader_name": leader_name,
+        "leader_mobile": leader_mobile,
+        "leader_email": email,
+    }
 
     execute(
-        "INSERT INTO users (name,email,password_hash,role) VALUES (%s,%s,%s,%s)",
-        (name, email, hash_password(password), role),
+        "INSERT INTO participant_applications (user_id, data_json, status) VALUES (%s,%s,'pending')",
+        (user_id, json.dumps(application_data)),
     )
+
     return redirect("/login")
 
-def logout(req):
-    # if session exists, delete it
-    from utils.request import parse_cookies
-    from auth.security import unsign
 
+# =========================
+# LOGOUT
+# =========================
+def logout(req):
     cookies = parse_cookies(req["environ"])
     signed = cookies.get("session")
+
     if signed:
+        from auth.security import unsign
+
         token = unsign(signed)
         if token:
             destroy_session(token)

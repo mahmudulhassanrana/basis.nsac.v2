@@ -2,18 +2,20 @@
 <html>
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{{ title }}</title>
-  <link rel="stylesheet" href="/static/style.css">
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  {{ extra_head }}
 </head>
-<body>
-  <div class="topbar">
-    <a href="/">Home</a>
-    <a href="/register">Register</a>
-    <a href="/login">Login</a>
-    <a href="/logout">Logout</a>
-  </div>
-  <div class="container">
-    {{ body }}
+<body class="bg-slate-50 text-slate-900">
+  <div class="min-h-screen">
+    <main>
+      {{ body }}
+    </main>
   </div>
 </body>
 </html>
+
