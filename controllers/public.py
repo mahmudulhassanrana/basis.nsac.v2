@@ -47,16 +47,39 @@ def home(req):
 # =========================
 # LOGIN
 # =========================
+def _login_extra_head():
+    return """
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+      .glass {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+      }
+      body {
+        background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%);
+        background-attachment: fixed;
+      }
+      .bg-blob {
+        filter: blur(80px);
+        z-index: -1;
+      }
+    </style>
+    """
+
 def login_get(req):
     html = render_page(
         "login.html",
         {
-            "title": "Login",
+            "title": "Login | NASA Space Apps BD",
+            "extra_head": _login_extra_head(),
             "error": "",
+            "error_box_class": "hidden",
         },
     )
     return response(html.encode("utf-8"))
-
 
 def login_post(req):
     data, _ = parse_form(req["environ"])
@@ -72,8 +95,10 @@ def login_post(req):
         html = render_page(
             "login.html",
             {
-                "title": "Login",
+                "title": "Login | NASA Space Apps BD",
+                "extra_head": _login_extra_head(),
                 "error": "Invalid email or password",
+                "error_box_class": "",  # show box
             },
         )
         return response(html.encode("utf-8"), status="401 Unauthorized")
@@ -82,7 +107,6 @@ def login_post(req):
     headers = []
     set_cookie(headers, "session", sign(token))
 
-    # Redirect by role
     role = user["role"]
     if role == "admin":
         return "302 Found", headers + [("Location", "/admin/dashboard")], [b""]
@@ -91,6 +115,7 @@ def login_post(req):
     if role == "volunteer":
         return "302 Found", headers + [("Location", "/volunteer/dashboard")], [b""]
     return "302 Found", headers + [("Location", "/participant/dashboard")], [b""]
+
 
 
 # =========================
