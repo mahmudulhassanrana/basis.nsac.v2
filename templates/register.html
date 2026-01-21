@@ -4,7 +4,7 @@
   <div class="absolute -top-24 -left-24 w-[380px] h-[380px] bg-blue-300/30 rounded-full blur-3xl"></div>
   <div class="absolute -bottom-24 -right-24 w-[420px] h-[420px] bg-indigo-300/30 rounded-full blur-3xl"></div>
 
-  <div class="w-full max-w-2xl relative">
+  <div class="w-full max-w-4xl relative">
     <!-- Top badge -->
     <div class="flex justify-center mb-6">
       <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/60 backdrop-blur-xl border border-white/40 shadow-sm">
@@ -45,20 +45,30 @@
           </label>
           <div class="mt-2 relative">
             <input name="team_name" required value=""
-              class="w-full rounded-2xl border border-white/60 bg-white/60 backdrop-blur px-4 py-3 outline-none
+              class="w-full rounded-2xl border border-black/10  backdrop-blur px-4 py-3 outline-none
                      text-slate-900 placeholder-slate-400 shadow-sm
                      focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 transition"
               placeholder="e.g., Team Phoenix" />
           </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div>
+            <label class="block text-xs font-black tracking-widest uppercase text-slate-600">
+              Team leader Name <span class="text-red-500">*</span>
+            </label>
+            <input name="leader_name" required value=""
+              class="mt-2 w-full rounded-2xl border border-black/10 bg-white/60 backdrop-blur px-4 py-3 outline-none
+                     text-slate-900 placeholder-slate-400 shadow-sm
+                     focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 transition"
+              placeholder="Full name" />
+          </div>          
           <div>
             <label class="block text-xs font-black tracking-widest uppercase text-slate-600">
               Location <span class="text-red-500">*</span>
             </label>
             <input name="location" required value=""
-              class="mt-2 w-full rounded-2xl border border-white/60 bg-white/60 backdrop-blur px-4 py-3 outline-none
+              class="mt-2 w-full rounded-2xl border border-black/10 bg-white/60 backdrop-blur px-4 py-3 outline-none
                      text-slate-900 placeholder-slate-400 shadow-sm
                      focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 transition"
               placeholder="e.g., Dhaka" />
@@ -69,60 +79,50 @@
               University <span class="text-red-500">*</span>
             </label>
             <input name="university" required value=""
-              class="mt-2 w-full rounded-2xl border border-white/60 bg-white/60 backdrop-blur px-4 py-3 outline-none
+              class="mt-2 w-full rounded-2xl border border-black/10 bg-white/60 backdrop-blur px-4 py-3 outline-none
                      text-slate-900 placeholder-slate-400 shadow-sm
                      focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 transition"
               placeholder="e.g., DIU" />
-          </div>
+          </div>          
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div>
-            <label class="block text-xs font-black tracking-widest uppercase text-slate-600">
-              Team leader Name <span class="text-red-500">*</span>
-            </label>
-            <input name="leader_name" required value=""
-              class="mt-2 w-full rounded-2xl border border-white/60 bg-white/60 backdrop-blur px-4 py-3 outline-none
-                     text-slate-900 placeholder-slate-400 shadow-sm
-                     focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 transition"
-              placeholder="Full name" />
-          </div>
-
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
           <div>
             <label class="block text-xs font-black tracking-widest uppercase text-slate-600">
               Team leader Mobile <span class="text-red-500">*</span>
             </label>
             <input name="leader_mobile" required value=""
-              class="mt-2 w-full rounded-2xl border border-white/60 bg-white/60 backdrop-blur px-4 py-3 outline-none
+              class="mt-2 w-full rounded-2xl border border-black/10 bg-white/60 backdrop-blur px-4 py-3 outline-none
                      text-slate-900 placeholder-slate-400 shadow-sm
                      focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 transition"
               placeholder="+8801XXXXXXXXX" />
           </div>
+          <div>
+            <label class="block text-xs font-black tracking-widest uppercase text-slate-600">
+              Team leader Email <span class="text-red-500">*</span><small>(login email)</small>
+            </label>
+            <input name="email" type="email" required value=""
+              class="mt-2 w-full rounded-2xl border border-black/10 bg-white/60 backdrop-blur px-4 py-3 outline-none
+                    text-slate-900 placeholder-slate-400 shadow-sm
+                    focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 transition"
+              placeholder="leader@example.com" />
+          </div>
+          <div>
+            <label class="block text-xs font-black tracking-widest uppercase text-slate-600">
+              Password <span class="text-red-500">*</span>
+            </label>
+            <input name="password" type="password" required minlength="6"
+              class="mt-2 w-full rounded-2xl border border-black/10 bg-white/60 backdrop-blur px-4 py-3 outline-none
+                    text-slate-900 placeholder-slate-400 shadow-sm
+                    focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 transition"
+              placeholder="Minimum 6 characters" />
+            <p class="mt-2 text-xs text-slate-500">Use at least 6 characters.</p>
+          </div>          
         </div>
-
-        <div>
-          <label class="block text-xs font-black tracking-widest uppercase text-slate-600">
-            Team leader Email (login email) <span class="text-red-500">*</span>
-          </label>
-          <input name="email" type="email" required value=""
-            class="mt-2 w-full rounded-2xl border border-white/60 bg-white/60 backdrop-blur px-4 py-3 outline-none
-                   text-slate-900 placeholder-slate-400 shadow-sm
-                   focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 transition"
-            placeholder="leader@example.com" />
+        <div class="text-sm text-slate-600 text-center justify-center">
+          <input name="accepted" value="1" type="checkbox" required />
+         <label class="text-slate-800">I hereby confirm that I have read, understood, and accepted the Terms and Conditions .</label>  <span class="text-red-500">*</span>
         </div>
-
-        <div>
-          <label class="block text-xs font-black tracking-widest uppercase text-slate-600">
-            Password <span class="text-red-500">*</span>
-          </label>
-          <input name="password" type="password" required minlength="6"
-            class="mt-2 w-full rounded-2xl border border-white/60 bg-white/60 backdrop-blur px-4 py-3 outline-none
-                   text-slate-900 placeholder-slate-400 shadow-sm
-                   focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 transition"
-            placeholder="Minimum 6 characters" />
-          <p class="mt-2 text-xs text-slate-500">Use at least 6 characters.</p>
-        </div>
-
         <button type="submit"
           class="w-full rounded-2xl bg-slate-900 text-white py-3.5 font-black tracking-wide
                  shadow-lg shadow-slate-900/10 hover:bg-blue-600 hover:shadow-blue-500/20
@@ -136,9 +136,5 @@
         </p>
       </form>
     </div>
-
-    <p class="text-center text-xs text-slate-500 mt-6">
-      By registering, you agree to follow the event rules and code of conduct.
-    </p>
   </div>
 </div>
