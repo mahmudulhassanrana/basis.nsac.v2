@@ -16,10 +16,29 @@ from utils.request import parse_form, parse_cookies
 # HOME
 # =========================
 def home(req):
+    extra_head = """
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script>
+      tailwind.config = { darkMode: 'class' }
+      function toggleTheme() { document.documentElement.classList.toggle('dark'); }
+    </script>
+    <style>
+      body { transition: background-color .5s, color .5s; }
+      .hero-gradient {
+        background: radial-gradient(circle at top right, rgba(37, 99, 235, 0.1), transparent);
+      }
+      .dark .hero-gradient {
+        background: radial-gradient(circle at top right, rgba(30, 58, 138, 0.3), transparent);
+      }
+    </style>
+    """
+
     html = render_page(
         "home.html",
         {
-            "title": "Hackathon Portal",
+            "title": "NASA Space Apps Challenge | Bangladesh 2026",
+            "extra_head": extra_head,
         },
     )
     return response(html.encode("utf-8"))
