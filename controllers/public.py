@@ -127,6 +127,7 @@ def register_get(req):
         {
             "title": "Participant Registration",
             "error": "",
+            "error_box_class": "hidden"
         },
     )
     return response(html.encode("utf-8"))
@@ -160,6 +161,7 @@ def register_post(req):
             {
                 "title": "Participant Registration",
                 "error": "All fields are required.",
+                "error_box_class": ""
             },
         )
         return response(html.encode("utf-8"), status="400 Bad Request")
