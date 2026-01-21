@@ -1,0 +1,21 @@
+<h2>Register</h2>
+<p class="error">{{ error }}</p>
+<form method="post" action="/register">
+  <label>Name</label><br/>
+  <input name="name" /><br/><br/>
+
+  <label>Email</label><br/>
+  <input name="email" type="email" /><br/><br/>
+
+  <label>Password</label><br/>
+  <input name="password" type="password" /><br/><br/>
+
+  <label>Role</label><br/>
+  <select name="role">
+    <option value="participant">Participant</option>
+    <option value="judge">Judge</option>
+    <option value="volunteer">Volunteer</option>
+  </select><br/><br/>
+
+  <button type="submit">Create account</button>
+</form>
