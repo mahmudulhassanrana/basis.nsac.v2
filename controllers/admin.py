@@ -1,7 +1,10 @@
 import json
+import math
 from auth.decorators import login_required, role_required
-from utils.response import response, render_partial, render_with_layout, render_html
-from db.database import query_one, query_all
+from utils.response import response, render_partial, render_with_layout, render_html,text, redirect
+from utils.form import get_form
+from db.database import query_one, query_all, execute
+from auth.decorators import login_required, role_required
 
 ADMIN_EXTRA_HEAD = """
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
@@ -199,11 +202,266 @@ def admin_dashboard(req):
 @login_required
 @role_required("admin")
 def admin_applications(req):
-    return _render_admin(
-        req, "All Applications", "applications",
-        "admin/application/index.html",
-        {"content_block": "Applications page loaded ✅"}
+    q = req["query"]
+    search = q.get("q", "").strip()
+    status = q.get("status", "").strip()
+    page = int(q.get("page", "1") or 1)
+    per_page = 10
+    offset = (page - 1) * per_page
+
+    where = "WHERE 1=1"
+    params = []
+
+    if status:
+        where += " AND status=%s"
+        params.append(status)
+
+    if search:
+        where += " AND data_json LIKE %s"
+        params.append(f"%{search}%")
+
+    total_row = query_one(
+        f"SELECT COUNT(*) AS c FROM participant_applications {where}",
+        params,
     )
+    total = int(total_row["c"])
+    total_pages = max(1, math.ceil(total / per_page))
+
+    rows = query_all(
+        f"""
+        SELECT id, status, data_json
+        FROM participant_applications
+        {where}
+        ORDER BY created_at DESC
+        LIMIT %s OFFSET %s
+        """,
+        params + [per_page, offset],
+    )
+
+    def badge(s):
+        return {
+            "approved": "bg-green-50 text-green-600",
+            "rejected": "bg-red-50 text-red-600",
+            "pending": "bg-orange-50 text-orange-600",
+        }.get(s, "bg-slate-50 text-slate-600")
+
+    table_rows = []
+    for r in rows:
+        d = json.loads(r["data_json"])
+        table_rows.append(f"""
+        <tr class="border-b border-slate-50">
+            <td class="pl-4 py-4 font-bold">{d.get("team_name","—")}</td>
+            <td class="py-4">{d.get("location","—")}</td>
+            <td class="py-4">{d.get("university","—")}</td>
+            <td class="text-center py-4">
+                <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase {badge(r['status'])}">
+                    {r['status']}
+                </span>
+            </td>
+            <td class="pr-4 py-4 text-center space-x-3 whitespace-nowrap">
+
+              <!-- View -->
+              <a href="/admin/applications/view?id={r['id']}"
+                class="text-slate-400 hover:text-blue-600 font-bold">
+                <i class="fa fa-eye" aria-hidden="true"></i>
+              </a>
+
+              <!-- Edit -->
+              <a href="/admin/applications/edit?id={r['id']}"
+                class="text-slate-400 hover:text-orange-600 font-bold">
+                <i class="fa fa-pencil-square" aria-hidden="true"></i>
+              </a>
+
+              <!-- Delete -->
+              <a href="/admin/applications/delete?id={r['id']}"
+                onclick="return confirm('Delete this application?')"
+                class="text-slate-400 hover:text-red-600 font-bold">
+                <i class="fa fa-trash" aria-hidden="true"></i>
+              </a>
+
+                {action_buttons(r['id'], r['status'])}
+
+            </td>
+
+        </tr>
+        """)
+
+    pagination_text = f"Showing {(offset+1)} to {min(offset+per_page, total)} of {total} Entries"
+
+    prev_page = max(1, page - 1)
+    next_page = min(total_pages, page + 1)
+
+    page_ctx = {
+        "rows": "\n".join(table_rows) or "<tr><td colspan='5'>No data</td></tr>",
+        "search": search,
+        "status": status,
+        "pagination_text": pagination_text,
+        "prev_page": prev_page,
+        "next_page": next_page,
+        "page": page,
+    }
+
+    return _render_admin(
+        req,
+        "All Applications",
+        "applications",
+        "admin/application/index.html",
+        page_ctx,
+    )
+
+def action_buttons(app_id, status):
+    buttons = []
+
+    if status == "pending":
+        buttons.append(f"""
+        <form method="post" action="/admin/applications/status" class="inline">
+          <input type="hidden" name="id" value="{app_id}">
+          <input type="hidden" name="status" value="approved">
+          <button type="submit"
+            class="text-green-600 hover:text-green-800 font-black"
+            title="Approve">
+            <i class="fa fa-check-circle"></i>
+          </button>
+        </form>
+        """)
+
+        buttons.append(f"""
+        <form method="post" action="/admin/applications/status" class="inline">
+          <input type="hidden" name="id" value="{app_id}">
+          <input type="hidden" name="status" value="rejected">
+          <button type="submit"
+            class="text-red-600 hover:text-red-800 font-black"
+            title="Reject">
+            <i class="fa fa-times-circle"></i>
+          </button>
+        </form>
+        """)
+
+    elif status == "approved":
+        buttons.append(f"""
+        <form method="post" action="/admin/applications/status" class="inline">
+          <input type="hidden" name="id" value="{app_id}">
+          <input type="hidden" name="status" value="rejected">
+          <button type="submit"
+            class="text-red-600 hover:text-red-800 font-black"
+            title="Reject">
+            <i class="fa fa-times-circle"></i>
+          </button>
+        </form>
+        """)
+
+    elif status == "rejected":
+        buttons.append(f"""
+        <form method="post" action="/admin/applications/status" class="inline">
+          <input type="hidden" name="id" value="{app_id}">
+          <input type="hidden" name="status" value="approved">
+          <button type="submit"
+            class="text-green-600 hover:text-green-800 font-black"
+            title="Approve">
+            <i class="fa fa-check-circle"></i>
+          </button>
+        </form>
+        """)
+
+    return "\n".join(buttons)
+
+
+@login_required
+@role_required("admin")
+def admin_application_view(req):
+    app_id = req["query"].get("id")
+
+    row = query_all(
+        "SELECT data_json, status FROM participant_applications WHERE id=%s",
+        [app_id]
+    )[0]
+
+    data = json.loads(row["data_json"])
+
+    return _render_admin(
+        req,
+        "View Application",
+        "applications",
+        "admin/application/view.html",
+        {
+            "data": json.dumps(data, indent=2),
+            "status": row["status"],
+        },
+    )
+
+@login_required
+@role_required("admin")
+def admin_application_edit(req):
+    if req["method"] == "POST":
+        app_id = req["query"]["id"]
+        status = req["form"]["status"]
+
+        execute(
+            "UPDATE participant_applications SET status=%s WHERE id=%s",
+            [status, app_id],
+        )
+        return redirect("/admin/applications")
+
+    app_id = req["query"]["id"]
+    row = query_all("SELECT status FROM participant_applications WHERE id=%s", [app_id])[0]
+
+    return _render_admin(
+        req,
+        "Edit Application",
+        "applications",
+        "admin/application/edit.html",
+        {"status": row["status"]},
+    )
+
+@login_required
+@role_required("admin")
+def admin_application_delete(req):
+    app_id = req["query"]["id"]
+    execute("DELETE FROM participant_applications WHERE id=%s", [app_id])
+    return redirect("/admin/applications")
+
+@login_required
+@role_required("admin")
+def admin_application_status(req):
+    form, _ = get_form(req)
+
+    app_id = form.get("id")
+    status = form.get("status")
+
+    if not app_id or status not in ("approved", "rejected", "pending"):
+        return redirect("/admin/applications")
+
+    execute(
+        "UPDATE participant_applications SET status=%s WHERE id=%s",
+        [status, app_id],
+    )
+
+    return redirect("/admin/applications")
+
+
+@login_required
+@role_required("admin")
+def admin_applications_export(req):
+    rows = query_all(
+        "SELECT data_json, status FROM participant_applications ORDER BY created_at DESC"
+    )
+
+    lines = ["Team Name,Location,University,Status"]
+    for r in rows:
+        d = json.loads(r["data_json"])
+        lines.append(
+            f"{d.get('team_name','')},{d.get('location','')},{d.get('university','')},{r['status']}"
+        )
+
+    csv = "\n".join(lines)
+    headers = [
+        ("Content-Type", "text/csv"),
+        ("Content-Disposition", "attachment; filename=applications.csv"),
+    ]
+    return "200 OK", headers, [csv.encode("utf-8")]
+
+
+
 
 @login_required
 @role_required("admin")
