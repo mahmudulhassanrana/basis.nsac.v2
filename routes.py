@@ -1,6 +1,6 @@
 from controllers.public import home, login_get, login_post, register_get, register_post, logout
 from controllers.participant import participant_dashboard, save_team_members, save_project
-from controllers.admin import admin_dashboard
+from controllers.admin import admin_dashboard,admin_applications,admin_rooms, admin_judges_volunteers, admin_control
 from controllers.judge import judge_dashboard
 from controllers.volunteer import volunteer_dashboard
 
@@ -12,11 +12,22 @@ ROUTES = [
     ("POST", "/register", register_post),
     ("GET",  "/logout", logout),
 
+    # Participant Routes
     ("GET",  "/participant/dashboard", participant_dashboard),
-    ("GET",  "/admin/dashboard", admin_dashboard),
-    ("GET",  "/judge/dashboard", judge_dashboard),
-    ("GET",  "/volunteer/dashboard", volunteer_dashboard),
     ("POST", "/participant/team-members", save_team_members),
     ("POST", "/participant/project", save_project),
+
+    # Admin Routes
+    ("GET", "/admin/dashboard", admin_dashboard),
+    ("GET", "/admin/applications", admin_applications),
+    ("GET", "/admin/rooms", admin_rooms),
+    ("GET", "/admin/judges-volunteers", admin_judges_volunteers),
+    ("GET", "/admin/control", admin_control),
+
+    #Judge Routes
+    ("GET",  "/judge/dashboard", judge_dashboard),
+
+    # Volunteer Routes
+    ("GET",  "/volunteer/dashboard", volunteer_dashboard),
 
 ]

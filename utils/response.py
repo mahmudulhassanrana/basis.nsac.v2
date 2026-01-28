@@ -20,18 +20,67 @@ def set_cookie(headers, key, value, path="/", http_only=True):
 def clear_cookie(headers, key, path="/"):
     headers.append(("Set-Cookie", f"{key}=; Path={path}; Max-Age=0"))
 
+def _templates_dir():
+    return os.path.join(os.path.dirname(__file__), "..", "templates")
+
 def _load_template(name: str) -> str:
-    base_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
-    with open(os.path.join(base_dir, name), "r", encoding="utf-8") as f:
+    """
+    Loads a template from /templates.
+    Supports nested paths like 'admin/layout.html' or 'admin/application/index.html'
+    """
+    base_dir = _templates_dir()
+    path = os.path.join(base_dir, name)
+    with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
+def _apply_context(html: str, context: dict) -> str:
+    """
+    Replace placeholders in both formats: {{ key }} and {{key}}
+    """
+    for k, v in (context or {}).items():
+        v = "" if v is None else str(v)
+        html = html.replace("{{ " + k + " }}", v)
+        html = html.replace("{{" + k + "}}", v)
+    return html
+
 def render_page(body_template: str, context: dict):
+    """
+    Render a normal page using the global templates/layout.html
+    """
     body_html = _load_template(body_template)
-    for k, v in context.items():
-        body_html = body_html.replace("{{ " + k + " }}", str(v))
+    body_html = _apply_context(body_html, context)
 
     layout = _load_template("layout.html")
     page = layout.replace("{{ body }}", body_html)
-    page = page.replace("{{ title }}", str(context.get("title", "Hackathon Portal")))
-    page = page.replace("{{ extra_head }}", str(context.get("extra_head", "")))
+    page = page.replace("{{ title }}", str((context or {}).get("title", "Hackathon Portal")))
+    page = page.replace("{{ extra_head }}", str((context or {}).get("extra_head", "")))
+    return page
+
+def render_partial(template_name: str, context: dict) -> str:
+    """
+    Render a template WITHOUT wrapping it with templates/layout.html.
+    Useful for admin content pages like:
+      - admin/dashboard.html
+      - admin/application/index.html
+    """
+    html = _load_template(template_name)
+    return _apply_context(html, context)
+
+def render_with_layout(layout_template: str, content_html: str, context: dict) -> str:
+    """
+    Render a custom layout (like admin/layout.html) and inject content into {{ content }}.
+    """
+    ctx = dict(context or {})
+    ctx["content"] = content_html
+    layout_html = _load_template(layout_template)
+    return _apply_context(layout_html, ctx)
+
+def render_html(body_html: str, title: str = "Hackathon Portal", extra_head: str = "") -> str:
+    """
+    Wrap raw HTML inside templates/layout.html (global layout).
+    """
+    layout = _load_template("layout.html")
+    page = layout.replace("{{ body }}", body_html)
+    page = page.replace("{{ title }}", str(title))
+    page = page.replace("{{ extra_head }}", str(extra_head))
     return page
