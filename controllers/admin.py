@@ -87,12 +87,12 @@ def admin_dashboard(req):
     # ---------------------------
     # KPI: Rooms Occupied
     # ---------------------------
-    rooms_total_row = query_one("SELECT COUNT(*) AS c FROM rooms")
+    rooms_total_row = query_one("SELECT COUNT(*) AS c FROM room")
     rooms_total = int((rooms_total_row or {}).get("c") or 0)
 
     rooms_occupied_row = query_one("""
         SELECT COUNT(DISTINCT room_id) AS c
-        FROM room_projects
+        FROM project_room
     """)
     rooms_occupied = int((rooms_occupied_row or {}).get("c") or 0)
 
@@ -721,11 +721,363 @@ def admin_applications_export(req):
 @login_required
 @role_required("admin")
 def admin_rooms(req):
+    rooms = query_all("""
+        SELECT
+            r.id,
+            r.name,
+            r.status,
+            SUM(CASE WHEN u.role='judge' THEN 1 ELSE 0 END) AS judge_count,
+            SUM(CASE WHEN u.role='volunteer' THEN 1 ELSE 0 END) AS volunteer_count,
+            COUNT(DISTINCT pr.projects_id) AS team_count
+        FROM room r
+        LEFT JOIN room_user ru ON ru.room_id = r.id
+        LEFT JOIN users u ON u.id = ru.user_id
+        LEFT JOIN project_room pr ON pr.room_id = r.id
+        GROUP BY r.id
+        ORDER BY r.id DESC
+    """)
+
+    rows_html = ""
+    for r in rooms:
+        rows_html += f"""
+        <tr class="border-b border-slate-50">
+          <td class="py-5 pl-4 font-bold">{r['name']}</td>
+          <td class="py-5">{int(r['judge_count'] or 0)}</td>
+          <td class="py-5">{int(r['volunteer_count'] or 0)}</td>
+          <td class="py-5">{int(r['team_count'] or 0)}</td>
+          <td class="py-5 pr-4 text-right space-x-3">
+            <a href="/admin/rooms/assign?id={r['id']}" class="text-blue-600 font-bold text-xs hover:underline">Assign Teams</a>
+            <a href="/admin/rooms/edit?id={r['id']}" class="text-orange-600 font-bold text-xs hover:underline">Edit</a>
+
+            <form method="post" action="/admin/rooms/delete" class="inline"
+                  onsubmit="return confirm('Delete this room and all related data?');">
+              <input type="hidden" name="id" value="{r['id']}">
+              <button class="text-red-600 font-bold text-xs hover:underline" type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+        """
+
+    if not rows_html:
+        rows_html = """
+        <tr><td class="py-8 text-slate-400 pl-4" colspan="5">No rooms found.</td></tr>
+        """
+
     return _render_admin(
-        req, "Location / Room", "rooms",
+        req,
+        "Location / Room",
+        "rooms",
         "admin/room/index.html",
-        {"content_block": "Rooms page loaded ✅"}
+        {
+            "rows": rows_html
+        }
     )
+
+@login_required
+@role_required("admin")
+def admin_room_create(req):
+    error = ""
+
+    judges = query_all("SELECT id, name, email FROM users WHERE role='judge' AND status='active' ORDER BY name")
+    volunteers = query_all("SELECT id, name, email FROM users WHERE role='volunteer' AND status='active' ORDER BY name")
+
+    if req["method"] == "POST":
+        form, _ = get_form(req)
+
+        name = (form.get("name") or "").strip()
+        judge_ids = form.get("judge_ids") or []
+        volunteer_ids = form.get("volunteer_ids") or []
+
+        # parse_qs can return string or list
+        if isinstance(judge_ids, str):
+            judge_ids = [judge_ids]
+        if isinstance(volunteer_ids, str):
+            volunteer_ids = [volunteer_ids]
+
+        if not name:
+            error = "Room name is required."
+
+        if not error:
+            execute("INSERT INTO room (name, status) VALUES (%s, 'active')", [name])
+            new_room = query_one("SELECT id FROM room ORDER BY id DESC LIMIT 1")
+            room_id = new_room["id"]
+
+            # insert room_user
+            for uid in judge_ids + volunteer_ids:
+                execute("INSERT IGNORE INTO room_user (user_id, room_id) VALUES (%s, %s)", [uid, room_id])
+
+            # After create -> go to assign teams
+            return redirect(f"/admin/rooms/assign?id={room_id}")
+
+    # build checkbox lists
+    judge_html = ""
+    for u in judges:
+        judge_html += f"""
+        <label class="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+          <input type="checkbox" name="judge_ids" value="{u['id']}" class="rounded">
+          <div>
+            <div class="text-sm font-bold text-slate-800">{u['name']}</div>
+            <div class="text-xs text-slate-400">{u['email']}</div>
+          </div>
+        </label>
+        """
+
+    volunteer_html = ""
+    for u in volunteers:
+        volunteer_html += f"""
+        <label class="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+          <input type="checkbox" name="volunteer_ids" value="{u['id']}" class="rounded">
+          <div>
+            <div class="text-sm font-bold text-slate-800">{u['name']}</div>
+            <div class="text-xs text-slate-400">{u['email']}</div>
+          </div>
+        </label>
+        """
+
+    return _render_admin(
+        req,
+        "Create Room",
+        "rooms",
+        "admin/room/create.html",
+        {
+            "error": error,
+            "error_box_class": "" if error else "hidden",
+            "judge_list": judge_html or "<div class='text-sm text-slate-400'>No active judges.</div>",
+            "volunteer_list": volunteer_html or "<div class='text-sm text-slate-400'>No active volunteers.</div>",
+            "name": "",
+        }
+    )
+
+@login_required
+@role_required("admin")
+def admin_room_edit(req):
+    room_id = req["query"].get("id")
+    if not room_id:
+        return redirect("/admin/rooms")
+
+    room = query_one("SELECT id, name FROM room WHERE id=%s", [room_id])
+    if not room:
+        return redirect("/admin/rooms")
+
+    assigned = query_all("SELECT user_id FROM room_user WHERE room_id=%s", [room_id])
+    assigned_ids = set([str(x["user_id"]) for x in assigned])
+
+    judges = query_all("SELECT id, name, email FROM users WHERE role='judge' AND status='active' ORDER BY name")
+    volunteers = query_all("SELECT id, name, email FROM users WHERE role='volunteer' AND status='active' ORDER BY name")
+
+    error = ""
+
+    if req["method"] == "POST":
+        form, _ = get_form(req)
+        name = (form.get("name") or "").strip()
+
+        judge_ids = form.get("judge_ids") or []
+        volunteer_ids = form.get("volunteer_ids") or []
+
+        if isinstance(judge_ids, str):
+            judge_ids = [judge_ids]
+        if isinstance(volunteer_ids, str):
+            volunteer_ids = [volunteer_ids]
+
+        if not name:
+            error = "Room name is required."
+
+        if not error:
+            execute("UPDATE room SET name=%s WHERE id=%s", [name, room_id])
+
+            # reset room_user for this room, then insert selected
+            execute("DELETE FROM room_user WHERE room_id=%s", [room_id])
+            for uid in judge_ids + volunteer_ids:
+                execute("INSERT IGNORE INTO room_user (user_id, room_id) VALUES (%s, %s)", [uid, room_id])
+
+            return redirect("/admin/rooms")
+
+    # build checkbox lists with checked state
+    judge_html = ""
+    for u in judges:
+        checked = "checked" if str(u["id"]) in assigned_ids else ""
+        judge_html += f"""
+        <label class="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+          <input type="checkbox" name="judge_ids" value="{u['id']}" class="rounded" {checked}>
+          <div>
+            <div class="text-sm font-bold text-slate-800">{u['name']}</div>
+            <div class="text-xs text-slate-400">{u['email']}</div>
+          </div>
+        </label>
+        """
+
+    volunteer_html = ""
+    for u in volunteers:
+        checked = "checked" if str(u["id"]) in assigned_ids else ""
+        volunteer_html += f"""
+        <label class="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+          <input type="checkbox" name="volunteer_ids" value="{u['id']}" class="rounded" {checked}>
+          <div>
+            <div class="text-sm font-bold text-slate-800">{u['name']}</div>
+            <div class="text-xs text-slate-400">{u['email']}</div>
+          </div>
+        </label>
+        """
+
+    return _render_admin(
+        req,
+        "Edit Room",
+        "rooms",
+        "admin/room/edit.html",
+        {
+            "room_id": str(room_id),
+            "name": room["name"],
+            "error": error,
+            "error_box_class": "" if error else "hidden",
+            "judge_list": judge_html or "<div class='text-sm text-slate-400'>No active judges.</div>",
+            "volunteer_list": volunteer_html or "<div class='text-sm text-slate-400'>No active volunteers.</div>",
+        }
+    )
+
+@login_required
+@role_required("admin")
+def admin_room_assign(req):
+    room_id = req["query"].get("id")
+    if not room_id:
+        return redirect("/admin/rooms")
+
+    room = query_one("SELECT id, name FROM room WHERE id=%s", [room_id])
+    if not room:
+        return redirect("/admin/rooms")
+
+    # POST: assign selected projects
+    if req["method"] == "POST":
+        form, _ = get_form(req)
+        project_ids = form.get("project_ids") or []
+        if isinstance(project_ids, str):
+            project_ids = [project_ids]
+
+        for pid in project_ids:
+            execute(
+                "INSERT IGNORE INTO project_room (projects_id, room_id) VALUES (%s, %s)",
+                [pid, room_id],
+            )
+
+        return redirect(f"/admin/rooms/assign?id={room_id}")
+
+    # ✅ Assigned teams in this room
+    assigned = query_all("""
+        SELECT
+            p.id AS project_id,
+            p.title,
+            pa.data_json
+        FROM project_room pr
+        JOIN projects p ON p.id = pr.projects_id
+        JOIN participant_applications pa ON pa.user_id = p.participant_id
+        WHERE pr.room_id = %s
+        ORDER BY pr.id DESC
+    """, [room_id])
+
+    assigned_rows = ""
+    for t in assigned:
+        try:
+            d = json.loads(t["data_json"] or "{}")
+        except Exception:
+            d = {}
+
+        assigned_rows += f"""
+        <div class="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100">
+          <div>
+            <div class="font-black text-slate-900">{d.get('team_name','—')}</div>
+            <div class="text-xs text-slate-500 mt-1">{t.get('title','—')}</div>
+          </div>
+
+          <form method="post" action="/admin/rooms/unassign"
+                onsubmit="return confirm('Remove this team from the room?');">
+            <input type="hidden" name="room_id" value="{room_id}">
+            <input type="hidden" name="project_id" value="{t['project_id']}">
+            <button type="submit"
+              class="text-red-600 font-bold text-xs hover:underline">
+              Remove
+            </button>
+          </form>
+        </div>
+        """
+
+    if not assigned_rows:
+        assigned_rows = "<div class='text-sm text-slate-400'>No teams assigned to this room yet.</div>"
+
+    # ✅ Available approved + unassigned teams
+    available = query_all("""
+        SELECT
+            p.id AS project_id,
+            p.title,
+            pa.data_json
+        FROM participant_applications pa
+        JOIN projects p ON p.participant_id = pa.user_id
+        LEFT JOIN project_room pr ON pr.projects_id = p.id
+        WHERE pa.status='approved'
+          AND pr.id IS NULL
+        ORDER BY p.id DESC
+    """)
+
+    available_rows = ""
+    for t in available:
+        try:
+            d = json.loads(t["data_json"] or "{}")
+        except Exception:
+            d = {}
+
+        available_rows += f"""
+        <label class="flex items-start gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+          <input type="checkbox" name="project_ids" value="{t['project_id']}" class="mt-1 rounded">
+          <div class="flex-1">
+            <div class="font-black text-slate-900">{d.get('team_name','—')}</div>
+            <div class="text-xs text-slate-500 mt-1">{t.get('title','—')}</div>
+          </div>
+        </label>
+        """
+
+    if not available_rows:
+        available_rows = "<div class='text-sm text-slate-400'>No approved unassigned teams available.</div>"
+
+    return _render_admin(
+        req,
+        f"Assign Teams • {room['name']}",
+        "rooms",
+        "admin/room/assign.html",
+        {
+            "room_id": str(room_id),
+            "room_name": room["name"],
+            "assigned_rows": assigned_rows,
+            "available_rows": available_rows,
+        }
+    )
+
+@login_required
+@role_required("admin")
+def admin_room_delete(req):
+    form, _ = get_form(req)
+    room_id = form.get("id")
+    if not room_id:
+        return redirect("/admin/rooms")
+
+    # delete related data first
+    execute("DELETE FROM project_room WHERE room_id=%s", [room_id])
+    execute("DELETE FROM room_user WHERE room_id=%s", [room_id])
+    execute("DELETE FROM room WHERE id=%s", [room_id])
+
+    return redirect("/admin/rooms")
+
+@login_required
+@role_required("admin")
+def admin_room_unassign(req):
+    form, _ = get_form(req)
+    room_id = form.get("room_id")
+    project_id = form.get("project_id")
+
+    if room_id and project_id:
+        execute(
+            "DELETE FROM project_room WHERE room_id=%s AND projects_id=%s",
+            [room_id, project_id],
+        )
+
+    return redirect(f"/admin/rooms/assign?id={room_id}")
 
 @login_required
 @role_required("admin")

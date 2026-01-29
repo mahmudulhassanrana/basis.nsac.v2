@@ -78,40 +78,6 @@ def migrate():
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     """)
 
-    # rooms
-    execute("""
-    CREATE TABLE IF NOT EXISTS rooms (
-      id BIGINT PRIMARY KEY AUTO_INCREMENT,
-      name VARCHAR(120) NOT NULL UNIQUE,
-      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    """)
-
-    # room users
-    execute("""
-    CREATE TABLE IF NOT EXISTS room_users (
-      id BIGINT PRIMARY KEY AUTO_INCREMENT,
-      room_id BIGINT NOT NULL,
-      user_id BIGINT NOT NULL,
-      role_in_room ENUM('judge','volunteer') NOT NULL,
-      UNIQUE KEY uniq_room_user_role (room_id, user_id, role_in_room),
-      CONSTRAINT fk_ru_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
-      CONSTRAINT fk_ru_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    """)
-
-    # room projects
-    execute("""
-    CREATE TABLE IF NOT EXISTS room_projects (
-      id BIGINT PRIMARY KEY AUTO_INCREMENT,
-      room_id BIGINT NOT NULL,
-      project_id BIGINT NOT NULL,
-      UNIQUE KEY uniq_room_project (room_id, project_id),
-      CONSTRAINT fk_rp_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
-      CONSTRAINT fk_rp_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    """)
-
     # evaluations
     execute("""
     CREATE TABLE IF NOT EXISTS evaluations (
@@ -124,6 +90,50 @@ def migrate():
       UNIQUE KEY uniq_judge_project (judge_id, project_id),
       CONSTRAINT fk_ev_judge FOREIGN KEY (judge_id) REFERENCES users(id) ON DELETE CASCADE,
       CONSTRAINT fk_ev_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    """)
+
+    # -----------------------------
+    # ✅ ROOM MODULE TABLES (NEW)
+    # -----------------------------
+
+    # room
+    execute("""
+    CREATE TABLE IF NOT EXISTS room (
+      id BIGINT PRIMARY KEY AUTO_INCREMENT,
+      name VARCHAR(191) NOT NULL,
+      status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    """)
+
+    # room_user (assign judges & volunteers to room)
+    execute("""
+    CREATE TABLE IF NOT EXISTS room_user (
+      id BIGINT PRIMARY KEY AUTO_INCREMENT,
+      user_id BIGINT NOT NULL,
+      room_id BIGINT NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_room_user (user_id, room_id),
+      INDEX idx_room_user_room (room_id),
+      INDEX idx_room_user_user (user_id),
+      CONSTRAINT fk_room_user_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      CONSTRAINT fk_room_user_room FOREIGN KEY (room_id) REFERENCES room(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    """)
+
+    # project_room (assign projects to room)
+    execute("""
+    CREATE TABLE IF NOT EXISTS project_room (
+      id BIGINT PRIMARY KEY AUTO_INCREMENT,
+      projects_id BIGINT NOT NULL,
+      room_id BIGINT NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_project (projects_id),
+      INDEX idx_project_room_room (room_id),
+      INDEX idx_project_room_project (projects_id),
+      CONSTRAINT fk_project_room_project FOREIGN KEY (projects_id) REFERENCES projects(id) ON DELETE CASCADE,
+      CONSTRAINT fk_project_room_room FOREIGN KEY (room_id) REFERENCES room(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     """)
 

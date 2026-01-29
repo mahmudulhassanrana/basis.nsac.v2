@@ -1,6 +1,6 @@
 from controllers.public import home, login_get, login_post, register_get, register_post, logout
 from controllers.participant import participant_dashboard, save_team_members, save_project
-from controllers.admin import admin_dashboard,admin_applications,admin_application_view,admin_application_edit,admin_application_delete,admin_application_status,admin_applications_export,admin_rooms, admin_judges_volunteers, admin_control
+from controllers.admin import admin_dashboard,admin_applications,admin_application_view,admin_application_edit,admin_application_delete,admin_application_status,admin_applications_export,admin_rooms,admin_room_create,admin_room_edit,admin_room_assign,admin_room_delete,admin_room_unassign, admin_judges_volunteers, admin_control
 from controllers.judge import judge_dashboard
 from controllers.volunteer import volunteer_dashboard
 
@@ -27,8 +27,18 @@ ROUTES = [
     ("GET",  "/admin/applications/delete", admin_application_delete),
     ("POST", "/admin/applications/status", admin_application_status),
     ("GET",  "/admin/applications/export", admin_applications_export),
+    #rooms
+    ("GET",  "/admin/rooms", admin_rooms),
+    ("GET",  "/admin/rooms/create", admin_room_create),
+    ("POST", "/admin/rooms/create", admin_room_create),
+    ("GET",  "/admin/rooms/edit", admin_room_edit),
+    ("POST", "/admin/rooms/edit", admin_room_edit),
+    ("GET",  "/admin/rooms/assign", admin_room_assign),
+    ("POST", "/admin/rooms/assign", admin_room_assign),
+    ("POST", "/admin/rooms/delete", admin_room_delete),
+    ("POST", "/admin/rooms/unassign", admin_room_unassign),
 
-    ("GET", "/admin/rooms", admin_rooms),
+
     ("GET", "/admin/judges-volunteers", admin_judges_volunteers),
     ("GET", "/admin/control", admin_control),
 
