@@ -465,26 +465,208 @@ def admin_application_view(req):
 @login_required
 @role_required("admin")
 def admin_application_edit(req):
-    if req["method"] == "POST":
-        app_id = req["query"]["id"]
-        status = req["form"]["status"]
-
-        execute(
-            "UPDATE participant_applications SET status=%s WHERE id=%s",
-            [status, app_id],
-        )
+    app_id = req["query"].get("id")
+    if not app_id:
         return redirect("/admin/applications")
 
-    app_id = req["query"]["id"]
-    row = query_all("SELECT status FROM participant_applications WHERE id=%s", [app_id])[0]
+    # Load application
+    app = query_one(
+        "SELECT id, user_id, status, data_json FROM participant_applications WHERE id=%s",
+        [app_id],
+    )
+    if not app:
+        return redirect("/admin/applications")
+
+    # Load project (participant_id = user_id)
+    project = query_one(
+        "SELECT participant_id, title, description, team_members_json FROM projects WHERE participant_id=%s",
+        [app["user_id"]],
+    )
+
+    # Parse JSON safely
+    def safe_json(s, default):
+        if not s:
+            return default
+        try:
+            return json.loads(s) if isinstance(s, str) else s
+        except Exception:
+            return default
+
+    app_data = safe_json(app.get("data_json"), {})
+
+    tm = safe_json(project.get("team_members_json") if project else None, {})
+    members = tm.get("members", []) or []
+    project_meta = tm.get("project_meta", {}) or {}
+
+    error = ""
+
+    # POST: Save changes
+    if req["method"] == "POST":
+        form, _ = get_form(req)
+
+        # Application fields
+        team_name = (form.get("team_name") or "").strip()
+        location = (form.get("location") or "").strip()
+        university = (form.get("university") or "").strip()
+        leader_name = (form.get("leader_name") or "").strip()
+        leader_email = (form.get("leader_email") or "").strip()
+        leader_mobile = (form.get("leader_mobile") or "").strip()
+        status = (form.get("status") or "pending").strip().lower()
+
+        # Project fields
+        project_title = (form.get("project_title") or "").strip()
+        project_description = (form.get("project_description") or "").strip()
+
+        category = (form.get("category") or "").strip()
+        team_url = (form.get("team_url") or "").strip()
+        video_link = (form.get("video_link") or "").strip()
+        github_link = (form.get("github_link") or "").strip()
+        data_sources = (form.get("data_sources") or "").strip()
+
+        # Members JSON (optional)
+        members_json_raw = (form.get("members_json") or "").strip()
+        new_members = members  # default keep existing
+
+        if members_json_raw:
+            try:
+                parsed = json.loads(members_json_raw)
+                if not isinstance(parsed, list):
+                    raise ValueError("Members JSON must be a list.")
+                new_members = parsed
+            except Exception as e:
+                error = f"Invalid Members JSON: {str(e)}"
+
+        # Basic validation (keep it minimal)
+        if not error:
+            if not team_name or not location or not university or not leader_name or not leader_email or not leader_mobile:
+                error = "Please fill all required application fields."
+            elif status not in ("pending", "approved", "rejected"):
+                error = "Invalid status value."
+
+        # Save if OK
+        if not error:
+            updated_app_data = {
+                "location": location,
+                "team_name": team_name,
+                "university": university,
+                "leader_name": leader_name,
+                "leader_email": leader_email,
+                "leader_mobile": leader_mobile,
+            }
+
+            execute(
+                "UPDATE participant_applications SET status=%s, data_json=%s WHERE id=%s",
+                [status, json.dumps(updated_app_data), app_id],
+            )
+
+            updated_meta = {
+                "category": category,
+                "team_url": team_url,
+                "video_link": video_link,
+                "github_link": github_link,
+                "data_sources": data_sources,
+            }
+
+            updated_team_members_json = {
+                "members": new_members,
+                "project_meta": updated_meta,
+            }
+
+            # Upsert project
+            if project:
+                execute(
+                    """
+                    UPDATE projects
+                    SET title=%s, description=%s, team_members_json=%s
+                    WHERE participant_id=%s
+                    """,
+                    [
+                        project_title,
+                        project_description,
+                        json.dumps(updated_team_members_json),
+                        app["user_id"],
+                    ],
+                )
+            else:
+                execute(
+                    """
+                    INSERT INTO projects (participant_id, title, description, team_members_json)
+                    VALUES (%s,%s,%s,%s)
+                    """,
+                    [
+                        app["user_id"],
+                        project_title,
+                        project_description,
+                        json.dumps(updated_team_members_json),
+                    ],
+                )
+
+            return redirect(f"/admin/applications/view?id={app_id}")
+
+        # If error, keep form values on page
+        app_data = {
+            "location": location,
+            "team_name": team_name,
+            "university": university,
+            "leader_name": leader_name,
+            "leader_email": leader_email,
+            "leader_mobile": leader_mobile,
+        }
+        app["status"] = status
+
+        project = project or {}
+        project["title"] = project_title
+        project["description"] = project_description
+        project_meta = {
+            "category": category,
+            "team_url": team_url,
+            "video_link": video_link,
+            "github_link": github_link,
+            "data_sources": data_sources,
+        }
+        members = new_members
+
+    # Prepare textarea JSON
+    members_json_pretty = json.dumps(members, indent=2)
+
+    # Render edit page
+    page_ctx = {
+        "app_id": str(app_id),
+
+        "error": error,
+        "error_box_class": "" if error else "hidden",
+
+        "team_name": app_data.get("team_name", ""),
+        "location": app_data.get("location", ""),
+        "university": app_data.get("university", ""),
+        "leader_name": app_data.get("leader_name", ""),
+        "leader_email": app_data.get("leader_email", ""),
+        "leader_mobile": app_data.get("leader_mobile", ""),
+
+        "status_pending_selected": "selected" if (app.get("status") == "pending") else "",
+        "status_approved_selected": "selected" if (app.get("status") == "approved") else "",
+        "status_rejected_selected": "selected" if (app.get("status") == "rejected") else "",
+
+        "project_title": (project.get("title") if project else "") or "",
+        "project_description": (project.get("description") if project else "") or "",
+
+        "category": project_meta.get("category", ""),
+        "team_url": project_meta.get("team_url", ""),
+        "video_link": project_meta.get("video_link", ""),
+        "github_link": project_meta.get("github_link", ""),
+        "data_sources": project_meta.get("data_sources", ""),
+
+        "members_json": members_json_pretty,
+    }
 
     return _render_admin(
         req,
         "Edit Application",
         "applications",
         "admin/application/edit.html",
-        {"status": row["status"]},
+        page_ctx,
     )
+
 
 @login_required
 @role_required("admin")
