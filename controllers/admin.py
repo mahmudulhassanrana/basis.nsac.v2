@@ -370,24 +370,102 @@ def action_buttons(app_id, status):
 @role_required("admin")
 def admin_application_view(req):
     app_id = req["query"].get("id")
+    if not app_id:
+        return redirect("/admin/applications")
 
-    row = query_all(
-        "SELECT data_json, status FROM participant_applications WHERE id=%s",
-        [app_id]
-    )[0]
+    # 1) Load application
+    app = query_one(
+        "SELECT id, user_id, status, data_json FROM participant_applications WHERE id=%s",
+        [app_id],
+    )
+    if not app:
+        return redirect("/admin/applications")
 
-    data = json.loads(row["data_json"])
+    # Parse application JSON
+    try:
+        app_data = json.loads(app["data_json"] or "{}")
+    except Exception:
+        app_data = {}
+
+    # 2) Load project for this participant (participant_id = user_id)
+    project = query_one(
+        "SELECT title, description, team_members_json FROM projects WHERE participant_id=%s",
+        [app["user_id"]],
+    )
+
+    project_title = "—"
+    project_description = "—"
+    project_meta = {}
+    members = []
+    data_sources = "—"
+
+    if project:
+        project_title = project.get("title") or "—"
+        project_description = project.get("description") or "—"
+
+        try:
+            tm = json.loads(project.get("team_members_json") or "{}")
+        except Exception:
+            tm = {}
+
+        members = tm.get("members", []) or []
+        project_meta = tm.get("project_meta", {}) or {}
+        data_sources = project_meta.get("data_sources") or "—"
+
+    # Build roster HTML from members list
+    roster_html = ""
+    for m in members:
+        roster_html += f"""
+        <div class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+            <span class="text-sm font-bold text-slate-700">
+                {m.get('name','—')}<br>
+                <i class="fa-solid fa-envelope text-slate-300 w-5"></i> {m.get('email','—')}<br>
+                <i class="fa-solid fa-phone text-slate-300 w-5"></i> {m.get('phone','—')}
+            </span>
+            <span class="text-[9px] font-black text-slate-400 uppercase">{(m.get('gender') or 'member')}</span>
+        </div>
+        """
+    if not roster_html:
+        roster_html = "<div class='text-sm text-slate-400'>No members added yet.</div>"
+
+    # Status button logic
+    status = (app.get("status") or "pending").lower()
+    show_approve = status != "approved"
+    show_reject = status != "rejected"
+
+    page_ctx = {
+        "app_id": str(app["id"]),
+        "team_name": app_data.get("team_name", "—"),
+        "location": app_data.get("location", "—"),
+        "university": app_data.get("university", "—"),
+        "leader_name": app_data.get("leader_name", "—"),
+        "leader_email": app_data.get("leader_email", "—"),
+        "leader_mobile": app_data.get("leader_mobile", "—"),
+
+        "roster_html": roster_html,
+
+        "project_title": project_title,
+        "project_category": project_meta.get("category", "—"),
+        "project_description": project_description,
+
+        "team_url": project_meta.get("team_url", "#"),
+        "video_link": project_meta.get("video_link", "#"),
+        "github_link": project_meta.get("github_link", "#"),
+        "data_sources": data_sources,
+
+        # show/hide buttons
+        "approve_btn_class": "" if show_approve else "hidden",
+        "reject_btn_class": "" if show_reject else "hidden",
+    }
 
     return _render_admin(
         req,
-        "View Application",
+        "Application Details",
         "applications",
-        "admin/application/view.html",
-        {
-            "data": json.dumps(data, indent=2),
-            "status": row["status"],
-        },
+        "admin/application/view.html",  # <-- your template path
+        page_ctx,
     )
+
 
 @login_required
 @role_required("admin")
