@@ -6,6 +6,9 @@ def migrate():
     CREATE TABLE IF NOT EXISTS users (
       id BIGINT PRIMARY KEY AUTO_INCREMENT,
       name VARCHAR(120) NOT NULL,
+      phone VARCHAR(120) NULL,
+      designation VARCHAR(120) NULL,
+      organization VARCHAR(120) NULL,
       email VARCHAR(190) NOT NULL UNIQUE,
       password_hash VARCHAR(255) NOT NULL,
       role ENUM('participant','admin','judge','volunteer') NOT NULL DEFAULT 'participant',

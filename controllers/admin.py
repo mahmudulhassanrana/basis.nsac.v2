@@ -716,8 +716,6 @@ def admin_applications_export(req):
     return "200 OK", headers, [csv.encode("utf-8")]
 
 
-
-
 @login_required
 @role_required("admin")
 def admin_rooms(req):
@@ -1082,11 +1080,133 @@ def admin_room_unassign(req):
 @login_required
 @role_required("admin")
 def admin_judges_volunteers(req):
-    return _render_admin(
-        req, "Judge & Volunteer", "jv",
-        "admin/judges_volunteers/index.html",
-        {"content_block": "Judges & Volunteers page loaded ✅"}
+    role = (req["query"].get("role") or "").strip()   # judge / volunteer / ""
+    status = (req["query"].get("status") or "").strip()  # active / inactive / ""
+    q = (req["query"].get("q") or "").strip()
+
+    where = "WHERE role IN ('judge','volunteer')"
+    params = []
+
+    if role in ("judge", "volunteer"):
+        where += " AND role=%s"
+        params.append(role)
+
+    if status in ("active", "inactive"):
+        where += " AND status=%s"
+        params.append(status)
+
+    if q:
+        where += " AND (name LIKE %s OR email LIKE %s)"
+        params.extend([f"%{q}%", f"%{q}%"])
+
+    users = query_all(
+        f"""
+        SELECT id, name, designation, organization, phone, email, role, status, created_at
+        FROM users
+        {where}
+        ORDER BY created_at DESC
+        """,
+        params,
     )
+
+    def badge_role(r):
+        return "bg-blue-50 text-blue-600" if r == "judge" else "bg-purple-50 text-purple-600"
+
+    def badge_status(s):
+        return "bg-green-50 text-green-600" if s == "active" else "bg-slate-100 text-slate-600"
+
+    rows = ""
+    for u in users:
+        toggle_to = "inactive" if u["status"] == "active" else "active"
+        toggle_label = "Deactivate" if u["status"] == "active" else "Activate"
+        toggle_color = "text-orange-600" if u["status"] == "active" else "text-green-600"
+
+        rows += f"""
+        <tr class="border-b border-slate-50">
+          <td class="py-5 pl-4 font-bold text-slate-900">
+            {u['name']}<br>
+            <small class="text-xs text-slate-400">{u['designation'] or ''} , {u['organization'] or ''}</small>
+          </td>
+          <td class="py-5 text-slate-600">
+            {u['email']}<br>
+            <small class="text-xs text-slate-400">{u['phone'] or ''}</small>
+          </td>
+          <td class="py-5">
+            <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase {badge_role(u['role'])}">
+              {u['role']}
+            </span>
+          </td>
+          <td class="py-5">
+            <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase {badge_status(u['status'])}">
+              {u['status']}
+            </span>
+          </td>
+          <td class="py-5 pr-4 text-right space-x-3">
+
+            <form method="post" action="/admin/judges-volunteers/status" class="inline">
+              <input type="hidden" name="id" value="{u['id']}">
+              <input type="hidden" name="status" value="{toggle_to}">
+              <button type="submit" class="{toggle_color} font-black text-xs hover:underline">
+                {toggle_label}
+              </button>
+            </form>
+
+            <form method="post" action="/admin/judges-volunteers/delete" class="inline"
+                  onsubmit="return confirm('Delete this user? This cannot be undone.');">
+              <input type="hidden" name="id" value="{u['id']}">
+              <button type="submit" class="text-red-600 font-black text-xs hover:underline">
+                <i class="fa fa-trash" aria-hidden="true"></i>
+              </button>
+            </form>
+
+          </td>
+        </tr>
+        """
+
+    if not rows:
+        rows = "<tr><td colspan='5' class='py-10 pl-4 text-slate-400'>No users found.</td></tr>"
+
+    return _render_admin(
+        req,
+        "Judge & Volunteer",
+        "jv",
+        "admin/judges_volunteers/index.html",
+        {
+            "rows": rows,
+            "q": q,
+            "role_judge_selected": "selected" if role == "judge" else "",
+            "role_volunteer_selected": "selected" if role == "volunteer" else "",
+            "status_active_selected": "selected" if status == "active" else "",
+            "status_inactive_selected": "selected" if status == "inactive" else "",
+        },
+    )
+
+
+@login_required
+@role_required("admin")
+def admin_jv_toggle_status(req):
+    form, _ = get_form(req)
+    user_id = form.get("id")
+    new_status = (form.get("status") or "").strip()
+
+    if user_id and new_status in ("active", "inactive"):
+        execute("UPDATE users SET status=%s WHERE id=%s AND role IN ('judge','volunteer')", [new_status, user_id])
+
+    return redirect("/admin/judges-volunteers")
+
+
+@login_required
+@role_required("admin")
+def admin_jv_delete(req):
+    form, _ = get_form(req)
+    user_id = form.get("id")
+
+    if user_id:
+        # users deletion will cascade sessions/evaluations due to FK in your schema
+        execute("DELETE FROM users WHERE id=%s AND role IN ('judge','volunteer')", [user_id])
+
+    return redirect("/admin/judges-volunteers")
+
 
 @login_required
 @role_required("admin")

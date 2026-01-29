@@ -1,6 +1,6 @@
 from controllers.public import home, login_get, login_post, register_get, register_post, logout
 from controllers.participant import participant_dashboard, save_team_members, save_project
-from controllers.admin import admin_dashboard,admin_applications,admin_application_view,admin_application_edit,admin_application_delete,admin_application_status,admin_applications_export,admin_rooms,admin_room_create,admin_room_edit,admin_room_assign,admin_room_delete,admin_room_unassign, admin_judges_volunteers, admin_control
+from controllers.admin import admin_dashboard,admin_applications,admin_application_view,admin_application_edit,admin_application_delete,admin_application_status,admin_applications_export,admin_rooms,admin_room_create,admin_room_edit,admin_room_assign,admin_room_delete,admin_room_unassign, admin_judges_volunteers,admin_jv_toggle_status,admin_jv_delete, admin_control
 from controllers.judge import judge_dashboard
 from controllers.volunteer import volunteer_dashboard
 
@@ -37,9 +37,11 @@ ROUTES = [
     ("POST", "/admin/rooms/assign", admin_room_assign),
     ("POST", "/admin/rooms/delete", admin_room_delete),
     ("POST", "/admin/rooms/unassign", admin_room_unassign),
+    #judges & volunteers
+    ("GET",  "/admin/judges-volunteers", admin_judges_volunteers),
+    ("POST", "/admin/judges-volunteers/status", admin_jv_toggle_status),
+    ("POST", "/admin/judges-volunteers/delete", admin_jv_delete),
 
-
-    ("GET", "/admin/judges-volunteers", admin_judges_volunteers),
     ("GET", "/admin/control", admin_control),
 
     #Judge Routes
