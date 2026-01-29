@@ -162,11 +162,6 @@ def admin_dashboard(req):
             <td class="py-5">{location}, {university}</td>
             <td class="py-5">{leader}</td>
             <td class="py-5">{badge_html(status)}</td>
-            <td class="py-5">
-              <a href="/admin/applications" class="text-slate-400 hover:text-blue-600" title="View">
-                <i class="fa-solid fa-ellipsis"></i>
-              </a>
-            </td>
         </tr>
         """)
 
