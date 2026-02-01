@@ -140,6 +140,34 @@ def migrate():
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     """)
 
+    # make_scores
+    execute("""
+      CREATE TABLE IF NOT EXISTS make_scores (
+        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+        user_id BIGINT NOT NULL,
+        registration_id BIGINT NOT NULL,
+
+        influence INT NOT NULL,
+        creativity INT NOT NULL,
+        validity INT NOT NULL,
+        relevance INT NOT NULL,
+        presentation INT NOT NULL,
+
+        round_influence INT NOT NULL,
+        round_creativity INT NOT NULL,
+        round_validity INT NOT NULL,
+        round_relevance INT NOT NULL,
+        round_presentation INT NOT NULL,
+
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+        UNIQUE KEY uniq_judge_reg (user_id, registration_id),
+        INDEX idx_reg (registration_id),
+        CONSTRAINT fk_make_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT fk_make_reg FOREIGN KEY (registration_id) REFERENCES participant_applications(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    """)
     # default admin (if not exists)
     from db.database import query_one, execute as exec2
     exists = query_one("SELECT id FROM users WHERE email=%s", ("admin@gmail.com",))
