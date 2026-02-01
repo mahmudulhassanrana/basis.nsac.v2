@@ -1,4 +1,4 @@
-from controllers.public import home, login_get, login_post, register_get, register_post, logout
+from controllers.public import home,portal_login_get,portal_login_post,portal_register_get,portal_register_post, login_get, login_post, register_get, register_post, logout
 from controllers.participant import participant_dashboard, save_team_members, save_project
 from controllers.admin import admin_dashboard,admin_applications,admin_application_view,admin_application_edit,admin_application_delete,admin_application_status,admin_applications_export,admin_rooms,admin_room_create,admin_room_edit,admin_room_assign,admin_room_delete,admin_room_unassign, admin_judges_volunteers,admin_jv_toggle_status,admin_jv_delete, admin_control
 from controllers.judge import judge_dashboard
@@ -18,7 +18,11 @@ ROUTES = [
     ("POST", "/participant/project", save_project),
 
     # Admin Routes
-    ("GET", "/admin/dashboard", admin_dashboard),
+    ("GET", "/portal-login", portal_login_get),
+    ("POST", "/portal-login", portal_login_post),
+    ("GET",  "/portal-register", portal_register_get),
+    ("POST", "/portal-register", portal_register_post),
+    ("GET", "/admin/dashboard", admin_dashboard),    
     #applications
     ("GET", "/admin/applications", admin_applications),
     ("GET",  "/admin/applications/view", admin_application_view),

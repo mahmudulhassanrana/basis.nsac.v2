@@ -10,6 +10,7 @@ from utils.response import (
     clear_cookie,
 )
 from utils.request import parse_form, parse_cookies
+from utils.form import get_form
 
 
 # =========================
@@ -210,6 +211,123 @@ def register_post(req):
 
     return redirect("/login")
 
+def portal_login_get(req):
+    html = render_page(
+        "admin/auth/login.html",
+        {
+            "title": "Login | NASA Space Apps BD",
+            "extra_head": _login_extra_head(),
+            "error": "",
+            "error_box_class": "hidden",
+        },
+    )
+    return response(html.encode("utf-8"))
+
+def portal_login_post(req):
+    data, _ = parse_form(req["environ"])
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+
+    user = query_one(
+        "SELECT * FROM users WHERE email=%s AND status='active'",
+        (email,),
+    )
+
+    if not user or not verify_password(password, user["password_hash"]):
+        html = render_page(
+            "login.html",
+            {
+                "title": "Login | NASA Space Apps BD",
+                "extra_head": _login_extra_head(),
+                "error": "Invalid email or password",
+                "error_box_class": "",  # show box
+            },
+        )
+        return response(html.encode("utf-8"), status="401 Unauthorized")
+
+    token = create_session(user["id"])
+    headers = []
+    set_cookie(headers, "session", sign(token))
+
+    role = user["role"]
+    if role == "admin":
+        return "302 Found", headers + [("Location", "/admin/dashboard")], [b""]
+    if role == "judge":
+        return "302 Found", headers + [("Location", "/judge/dashboard")], [b""]
+    if role == "volunteer":
+        return "302 Found", headers + [("Location", "/volunteer/dashboard")], [b""]
+    return "302 Found", headers + [("Location", "/participant/dashboard")], [b""]    
+
+# =========================
+# ADMIN REGISTER (FULL PROCESS)
+# =========================
+def portal_register_get(req):
+    html = render_page(
+        "admin/auth/register.html",
+        {
+            "title": "Personnel Registration",
+            "error": "",
+            "error_box_class": "hidden"
+        },
+    )
+    return response(html.encode("utf-8"))
+
+
+def portal_register_post(req):
+    form, _ = get_form(req)
+
+    # Extracting fields from your Judge/Volunteer form
+    name = (form.get("name") or "").strip()
+    designation = (form.get("designation") or "").strip()
+    organization = (form.get("organization") or "").strip()
+    phone = (form.get("phone") or "").strip()
+    email = (form.get("email") or "").strip().lower()
+    password = form.get("password") or ""
+    
+    # Mapping 'type' directly to 'role' (judge/volunteer)
+    role = (form.get("type") or "volunteer").strip()
+
+    # 1. Validation: Ensure all fields are filled
+    if not all([name, designation, organization, phone, email, password, role]):
+        html = render_page(
+            "admin/auth/register.html",
+            {
+                "title": "Personnel Registration",
+                "error": "All fields are required for verification.",
+            },
+        )
+        return response(html.encode("utf-8"), status="400 Bad Request")
+
+    # 2. Password Length Check
+    if len(password) < 6:
+        html = render_page(
+            "admin/auth/register.html",
+            {
+                "title": "Personnel Registration",
+                "error": "Password must be at least 6 characters.",
+            },
+        )
+        return response(html.encode("utf-8"), status="400 Bad Request")
+
+    # 3. Check if user already exists
+    exists = query_one("SELECT id FROM users WHERE email=%s", (email,))
+    if exists:
+        html = render_page(
+            "admin/auth/register.html",
+            {
+                "title": "Personnel Registration",
+                "error": "This email is already registered.",
+            },
+        )
+        return response(html.encode("utf-8"), status="409 Conflict")
+
+    # 4. Insert into users table (Role is assigned here)
+    execute(
+        "INSERT INTO users (name, designation, organization, phone, email, password_hash, role) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+        (name, designation, organization, phone, email, hash_password(password), role),
+    )
+    # 5. Redirect to login page after successful registration
+    return redirect("/login")
 
 # =========================
 # LOGOUT
