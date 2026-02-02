@@ -197,6 +197,12 @@ def save_project(req):
         "data_sources": data_sources,
         "video_link": video_link,
         "github_link": github_link,
+        "team_work_score": 5,
+        "user_experience_score": 5,
+        "is_nasa_data_usage_score": 5,
+        "is_challenge_category_score": 1,
+        "id_project_link_score": 1,
+        "is_nasa_global_team_url_score": 1,
     }
     payload = {"members": members, "project_meta": meta}
 
