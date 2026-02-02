@@ -22,18 +22,21 @@ A web-based competition management system built with Python and MySQL, designed 
 ## Installation
 
 1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/your-username/nsac-competition-system.git
    cd nsac-competition-system
    ```
 
 2. **Create a virtual environment:**
+
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
 3. **Install dependencies:**
+
    ```bash
    pip install -r requirements.txt
    ```
@@ -58,15 +61,19 @@ A web-based competition management system built with Python and MySQL, designed 
 ## Usage
 
 1. **Run database migrations:**
+
    ```bash
    python wsgi_server.py
    ```
+
    This will create all necessary tables and insert a default admin user.
 
 2. **Start the development server:**
+
    ```bash
    python wsgi_server.py
    ```
+
    The application will be available at `http://127.0.0.1:8000`
 
 3. **Access the application:**
@@ -86,6 +93,7 @@ Key configuration options in `config.py`:
 ## Database Schema
 
 The system uses the following main tables:
+
 - `users` - User accounts with roles
 - `participant_applications` - Registration applications
 - `projects` - Project information and team members
@@ -99,20 +107,24 @@ The system uses the following main tables:
 ## API Endpoints
 
 ### Participant Routes
+
 - `GET /` - Home page
-- `GET/POST /login` - User login
-- `GET/POST /register` - User registration
+- `GET/POST /login` - Participant login
+- `GET/POST /register` - Participant registration
 
 ### Participant Routes
+
 - `GET /participant/dashboard` - Participant dashboard
 - `POST /participant/team-members` - Save team information
 - `POST /participant/project` - Save project details
 
 ### Admin,Judge And Volunteer Routes
+
 - `GET/POST /portal-login` - Admin,Judge And Volunteer login
 - `GET/POST /portal-register` - Judge And Volunteer registration
 
 ### Admin Routes
+
 - `GET /admin/dashboard` - Admin dashboard
 - `GET /admin/applications` - Manage applications
 - `GET /admin/rooms` - Room management
@@ -120,16 +132,19 @@ The system uses the following main tables:
 - `GET /admin/results` - View and process results
 
 ### Judge Routes
+
 - `GET /judge/dashboard` - Judge dashboard
 - `GET/POST /judge/score` - Score projects
 
 ### Volunteer Routes
+
 - `GET /volunteer/dashboard` - Volunteer dashboard
 - `GET /volunteer/view` - View assigned tasks
 
 ## Development
 
 ### Project Structure
+
 ```
 ├── app.py                 # Main WSGI application
 ├── config.py              # Configuration settings
@@ -145,12 +160,9 @@ The system uses the following main tables:
 └── utils/                 # Utility functions
 ```
 
-### Running Tests
-```bash
-# Add your test commands here
-```
 
 ### Code Style
+
 - Follow PEP 8 Python style guidelines
 - Use meaningful variable and function names
 - Add docstrings to functions and classes
@@ -164,6 +176,7 @@ The system uses the following main tables:
    - Disable debug mode
 
 2. **Environment Variables:**
+
    ```bash
    export DEBUG=0
    export APP_SECRET=your-production-secret
@@ -185,6 +198,7 @@ The system uses the following main tables:
 5. Open a Pull Request
 
 ### Guidelines
+
 - Write clear, concise commit messages
 - Add tests for new features
 - Update documentation as needed
@@ -197,7 +211,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Support
 
 For support, please open an issue on GitHub or contact the maintainers.
-
 
 ## Acknowledgments
 
