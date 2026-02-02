@@ -1,3 +1,11 @@
+#   """
+#   NSAC Competition Management System - Admin Controller
+
+#   This module handles all administrative functions including user management,
+#   application processing, room assignments, judge/volunteer management,
+#   and results processing for the competition system.
+#   """
+
 import json
 import math
 from auth.decorators import login_required, role_required
@@ -19,6 +27,16 @@ ADMIN_EXTRA_HEAD = """
 """
 
 def _admin_base(user, page_title: str):
+#   """
+#   Create the base context dictionary for admin pages.
+
+#   Args:
+#       user (dict): The current user information.
+#       page_title (str): The title for the current page.
+
+#   Returns:
+#       dict: Base context with user info, navigation states, and page metadata.
+#   """
     avatar_name = (user.get("name") or "Admin").replace(" ", "+")
     return {
         "title": "Admin | NASA Space Apps BD",
@@ -40,6 +58,13 @@ def _admin_base(user, page_title: str):
     }
 
 def _set_active(ctx, active: str):
+#   """
+#   Set the active navigation item in the admin context.
+
+#   Args:
+#       ctx (dict): The context dictionary to modify.
+#       active (str): The active navigation section ('dashboard', 'applications', 'rooms', 'jv', 'result').
+#   """
     if active == "dashboard":
         ctx["nav_dashboard_active"] = "active"
     elif active == "applications":
@@ -52,10 +77,21 @@ def _set_active(ctx, active: str):
         ctx["nav_results_active"] = "active"
 
 def _render_admin(req, page_title: str, active: str, page_tpl: str, page_ctx: dict):
-    # """
-    # Render admin page with:
-    #   content page -> admin/layout.html -> global templates/layout.html
-    # """
+#   """
+#   Render an admin page with proper layout hierarchy.
+
+#   Renders the page through: content page -> admin/layout.html -> global templates/layout.html
+
+#   Args:
+#       req (dict): The request object containing user info.
+#       page_title (str): The title for the page.
+#       active (str): The active navigation section.
+#       page_tpl (str): The template file for the page content.
+#       page_ctx (dict): Context variables for the page template.
+
+#   Returns:
+#       tuple: (status, headers, body) for the HTTP response.
+#   """
     user = req["user"]
     base = _admin_base(user, page_title)
     _set_active(base, active)
@@ -78,6 +114,18 @@ def _render_admin(req, page_title: str, active: str, page_tpl: str, page_ctx: di
 @login_required
 @role_required("admin")
 def admin_dashboard(req):
+#   """
+#   Display the admin dashboard with key performance indicators and recent applications.
+
+#   Calculates KPIs for total teams, room occupancy, active judges/volunteers,
+#   submissions, and completion rate. Also shows recent participant applications.
+
+#   Args:
+#       req (dict): The request object.
+
+#   Returns:
+#       tuple: HTTP response from _render_admin.
+#   """
     # ---------------------------
     # KPI: Total Teams
     # ---------------------------

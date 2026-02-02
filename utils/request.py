@@ -1,9 +1,25 @@
+#   """
+#   NSAC Competition Management System - Request Utilities
+
+#   This module provides utilities for parsing HTTP requests, including
+#   query parameters, form data, cookies, and user authentication.
+#   """
+
 from urllib.parse import parse_qs
 import cgi
 from auth.security import unsign
 from auth.sessions import get_user_by_session
 
 def parse_cookies(environ):
+#   """
+#   Parse HTTP cookies from the WSGI environ.
+
+#   Args:
+#       environ (dict): WSGI environment dictionary.
+
+#   Returns:
+#       dict: Dictionary of cookie name-value pairs.
+#   """
     raw = environ.get("HTTP_COOKIE", "")
     cookies = {}
     for part in raw.split(";"):
@@ -29,7 +45,7 @@ def parse_form(environ):
             item = fs[key]
             if getattr(item, "filename", None):
                 file_item = item
-            else:
+        else:#  
                 data[key] = item.value
         return data, file_item
 

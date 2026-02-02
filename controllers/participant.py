@@ -1,3 +1,10 @@
+#   """
+#   NSAC Competition Management System - Participant Controller
+
+#   This module handles participant-specific functionality including dashboard access,
+#   team member management, and project information submission.
+#   """
+
 import json
 from auth.decorators import login_required, role_required
 from utils.response import response, render_page, redirect

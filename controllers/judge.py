@@ -1,3 +1,10 @@
+#   """
+#   NSAC Competition Management System - Judge Controller
+
+#   This module handles judge-specific functionality including dashboard access
+#   and project scoring with detailed evaluation criteria.
+#   """
+
 import json
 from auth.decorators import login_required, role_required
 from utils.response import response, render_partial, render_with_layout, render_html, redirect

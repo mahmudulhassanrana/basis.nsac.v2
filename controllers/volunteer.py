@@ -1,3 +1,10 @@
+#   """
+#   NSAC Competition Management System - Volunteer Controller
+
+#   This module handles volunteer-specific functionality including dashboard access
+#   and viewing assigned tasks and room information.
+#   """
+
 import json
 from auth.decorators import login_required, role_required
 from utils.response import response, render_partial, render_with_layout, render_html, redirect

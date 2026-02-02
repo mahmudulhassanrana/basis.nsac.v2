@@ -1,6 +1,20 @@
+#   """
+#   NSAC Competition Management System - Database Migrations
+
+#   This module handles database schema creation and initialization.
+#   It defines all tables for the competition management system and creates a default admin user.
+#   """
+
 from db.database import execute
 
 def migrate():
+#   """
+#   Execute database migrations to create all necessary tables.
+
+#   Creates tables for users, sessions, site config, participant applications,
+#   projects, submissions, evaluations, rooms, and scoring data.
+#   Also inserts a default admin user.
+#   """
     # users
     execute("""
     CREATE TABLE IF NOT EXISTS users (

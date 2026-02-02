@@ -1,11 +1,40 @@
+#   """
+#   NSAC Competition Management System - Response Utilities
+
+#   This module provides utilities for generating HTTP responses, including
+#   HTML rendering, redirects, and template processing for the web application.
+#   """
+
 import os
 
 def response(body: bytes, status="200 OK", headers=None):
+#   """
+#   Create a basic HTTP response tuple.
+
+#   Args:
+#       body (bytes): The response body content.
+#       status (str): HTTP status line (default: "200 OK").
+#       headers (list): List of (name, value) header tuples.
+
+#   Returns:
+#       tuple: (status, headers, body_list) for WSGI.
+#   """
     headers = headers or []
     headers = [("Content-Type", "text/html; charset=utf-8")] + headers
     return status, headers, [body]
 
 def text(msg: str, status="200 OK", headers=None):
+#   """
+#   Create a text response.
+
+#   Args:
+#       msg (str): The text message to send.
+#       status (str): HTTP status line.
+#       headers (list): Additional headers.
+
+#   Returns:
+#       tuple: HTTP response tuple.
+#   """
     return response(msg.encode("utf-8"), status=status, headers=headers)
 
 def redirect(location: str):

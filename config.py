@@ -1,3 +1,11 @@
+#   """
+#   NSAC Competition Management System - Configuration Module
+
+#   This module contains all configuration settings for the application,
+#   including database, server, upload, session, and security settings.
+#   All settings can be overridden using environment variables.
+#   """
+
 import os
 from pathlib import Path
 
@@ -10,7 +18,7 @@ BASE_DIR = Path(__file__).resolve().parent
 # =========================
 # APPLICATION SETTINGS
 # =========================
-# IMPORTANT: change this before production
+# IMPORTANT: Change this secret key before deploying to production
 APP_SECRET = os.environ.get(
     "APP_SECRET",
     "dev-secret-change-this-to-a-long-random-string"

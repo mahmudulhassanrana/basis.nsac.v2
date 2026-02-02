@@ -1,3 +1,10 @@
+#   """
+#   NSAC Competition Management System - Public Controller
+
+#   This module handles public-facing routes including home page, user authentication,
+#   registration, and logout functionality for all user types.
+#   """
+
 import json
 from db.database import query_one, execute
 from auth.security import hash_password, verify_password, sign

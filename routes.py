@@ -1,9 +1,17 @@
+#   """
+#   NSAC Competition Management System - Routing Module
+
+#   This module defines all URL routes for the application, mapping HTTP methods and paths
+#   to their corresponding controller handlers. Routes are organized by user roles.
+#   """
+
 from controllers.public import home,portal_login_get,portal_login_post,portal_register_get,portal_register_post, login_get, login_post, register_get, register_post, logout
 from controllers.participant import participant_dashboard, save_team_members, save_project
 from controllers.admin import admin_dashboard,admin_applications,admin_application_view,admin_application_edit,admin_application_delete,admin_application_status,admin_applications_export,admin_rooms,admin_room_create,admin_room_edit,admin_room_assign,admin_room_delete,admin_room_unassign, admin_judges_volunteers,admin_jv_toggle_status,admin_jv_delete,admin_results_index,admin_results_process,admin_results_export
 from controllers.judge import judge_dashboard, judge_score_view, judge_score_submit
 from controllers.volunteer import volunteer_dashboard,volunteer_view
 
+# List of routes as tuples: (HTTP_METHOD, PATH, HANDLER_FUNCTION)
 ROUTES = [
     ("GET",  "/", home),
     ("GET",  "/login", login_get),
