@@ -1,4 +1,4 @@
-# NSAC Competition Management System
+# BASIS NASA Space Apps Challenge Bangladesh Hackathon Platform
 
 A web-based competition management system built with Python and MySQL, designed to handle participant registrations, project submissions, judging processes, and administrative controls for science and arts competitions.
 
