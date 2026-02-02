@@ -35,6 +35,7 @@ def _admin_base(user, page_title: str):
         "nav_rooms_active": "",
         "nav_jv_active": "",
         "nav_control_active": "",
+        "nav_results_active": "",
         "nav_inactive": "text-slate-500 hover:bg-slate-50 hover:text-blue-600",
     }
 
@@ -47,14 +48,14 @@ def _set_active(ctx, active: str):
         ctx["nav_rooms_active"] = "active"
     elif active == "jv":
         ctx["nav_jv_active"] = "active"
-    elif active == "control":
-        ctx["nav_control_active"] = "active"
+    elif active == "result":
+        ctx["nav_results_active"] = "active"
 
 def _render_admin(req, page_title: str, active: str, page_tpl: str, page_ctx: dict):
-    """
-    Render admin page with:
-      content page -> admin/layout.html -> global templates/layout.html
-    """
+    # """
+    # Render admin page with:
+    #   content page -> admin/layout.html -> global templates/layout.html
+    # """
     user = req["user"]
     base = _admin_base(user, page_title)
     _set_active(base, active)
@@ -1313,7 +1314,7 @@ def admin_results_index(req):
     return _render_admin(
         req,
         "Result Evaluation",
-        "dashboard",
+        "result", 
         "admin/result/index.html",
         {
             "msg": msg,
