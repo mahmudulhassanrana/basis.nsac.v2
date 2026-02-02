@@ -1207,12 +1207,319 @@ def admin_jv_delete(req):
 
     return redirect("/admin/judges-volunteers")
 
+# ----------------------------
+# Helpers
+# ----------------------------
+def _safe_json(val, default):
+    try:
+        return json.loads(val) if val else default
+    except Exception:
+        return default
+
+def _to_float(x, default=0.0):
+    try:
+        return float(x)
+    except Exception:
+        return float(default)
+
+def _has_female_member(team_members_json: str) -> bool:
+    payload = _safe_json(team_members_json, {})
+    members = payload.get("members", []) or []
+    for m in members:
+        if (m.get("gender") or "").lower() == "female":
+            return True
+    return False
+
+
+# ----------------------------
+# GET /admin/results
+# ----------------------------
+@login_required
+@role_required("admin")
+def admin_results_index(req):
+    q = req["query"]
+    msg = (q.get("msg") or "").strip()
+
+    search = (q.get("q") or "").strip()
+    min_score = (q.get("min") or "").strip()
+    max_score = (q.get("max") or "").strip()
+    scored = (q.get("scored") or "").strip()  # yes / no / ""
+
+    where = "WHERE 1=1"
+    params = []
+
+    if scored == "yes":
+        where += " AND pa.final_score IS NOT NULL"
+    elif scored == "no":
+        where += " AND pa.final_score IS NULL"
+
+    if min_score:
+        where += " AND pa.final_score >= %s"
+        params.append(min_score)
+
+    if max_score:
+        where += " AND pa.final_score <= %s"
+        params.append(max_score)
+
+    if search:
+        # search inside JSON text (simple + works with your schema)
+        where += " AND pa.data_json LIKE %s"
+        params.append(f"%{search}%")
+
+    rows = query_all(f"""
+        SELECT pa.id, pa.final_score, pa.data_json
+        FROM participant_applications pa
+        {where}
+        ORDER BY (pa.final_score IS NULL), pa.final_score DESC, pa.id DESC
+        LIMIT 300
+    """, params)
+
+    table_rows = ""
+    for r in rows:
+        data = _safe_json(r.get("data_json"), {})
+        team = data.get("team_name", "—")
+        leader_name = data.get("leader_name", "—")
+        leader_email = data.get("leader_email", "—")
+        leader_mobile = data.get("leader_mobile", "—")
+        location = data.get("location", "—")
+        university = data.get("university", "—")
+
+        score = r.get("final_score")
+        score_text = "—" if score is None else str(score)
+
+        table_rows += f"""
+        <tr class="border-b border-slate-50">
+          <td class="py-5 pl-4 font-bold">{r['id']}</td>
+          <td class="py-5">
+            <div class="font-black text-slate-900">{team}</div>
+            <div class="text-xs text-slate-500 mt-1">{location} • {university}</div>
+          </td>
+          <td class="py-5">
+            <div class="font-bold text-slate-800">{leader_name}</div>
+            <div class="text-xs text-slate-500 mt-1">{leader_email}</div>
+            <div class="text-xs text-slate-500">{leader_mobile}</div>
+          </td>
+          <td class="py-5 font-black text-slate-900">{score_text}</td>
+        </tr>
+        """
+
+    if not table_rows:
+        table_rows = "<tr><td colspan='4' class='py-10 pl-4 text-slate-400'>No results found.</td></tr>"
+
+    # keep selected states
+    scored_yes_selected = "selected" if scored == "yes" else ""
+    scored_no_selected = "selected" if scored == "no" else ""
+
+    return _render_admin(
+        req,
+        "Result Evaluation",
+        "dashboard",
+        "admin/result/index.html",
+        {
+            "msg": msg,
+            "msg_box_class": "" if msg else "hidden",
+
+            "rows": table_rows,
+
+            # filter values
+            "q": search,
+            "min": min_score,
+            "max": max_score,
+            "scored_yes_selected": scored_yes_selected,
+            "scored_no_selected": scored_no_selected,
+        }
+    )
+
+# ----------------------------
+# POST /admin/results/process
+# ----------------------------
+@login_required
+@role_required("admin")
+def admin_results_process(req):
+    # Button press => calculate in real time
+    form, _ = get_form(req)
+
+    # ----------------------------
+    # STEP 1: Normalize per judge
+    # ----------------------------
+    # For each judge, compute max for each segment and scale to 20.
+    max_rows = query_all("""
+        SELECT
+          user_id,
+          MAX(influence) AS max_influence,
+          MAX(creativity) AS max_creativity,
+          MAX(validity) AS max_validity,
+          MAX(relevance) AS max_relevance,
+          MAX(presentation) AS max_presentation
+        FROM make_scores
+        GROUP BY user_id
+    """)
+
+    for m in max_rows:
+        uid = m["user_id"]
+        r_inf = 20.0 / float(m["max_influence"]) if m["max_influence"] and float(m["max_influence"]) > 0 else 0.0
+        r_cre = 20.0 / float(m["max_creativity"]) if m["max_creativity"] and float(m["max_creativity"]) > 0 else 0.0
+        r_val = 20.0 / float(m["max_validity"]) if m["max_validity"] and float(m["max_validity"]) > 0 else 0.0
+        r_rel = 20.0 / float(m["max_relevance"]) if m["max_relevance"] and float(m["max_relevance"]) > 0 else 0.0
+        r_pre = 20.0 / float(m["max_presentation"]) if m["max_presentation"] and float(m["max_presentation"]) > 0 else 0.0
+
+        # update all marks for this judge in one query
+        execute("""
+            UPDATE make_scores
+            SET
+              round_influence    = influence    * %s,
+              round_creativity   = creativity   * %s,
+              round_validity     = validity     * %s,
+              round_relevance    = relevance    * %s,
+              round_presentation = presentation * %s
+            WHERE user_id = %s
+        """, [r_inf, r_cre, r_val, r_rel, r_pre, uid])
+
+    # ----------------------------
+    # STEP 2: Compute team final_score
+    # ----------------------------
+    # Get average normalized marks per registration
+    avg_rows = query_all("""
+        SELECT
+          registration_id,
+          AVG(round_influence)    AS avg_influence,
+          AVG(round_creativity)   AS avg_creativity,
+          AVG(round_validity)     AS avg_validity,
+          AVG(round_relevance)    AS avg_relevance,
+          AVG(round_presentation) AS avg_presentation,
+          COUNT(*) AS judge_count
+        FROM make_scores
+        GROUP BY registration_id
+    """)
+    avg_map = {str(r["registration_id"]): r for r in avg_rows}
+
+    # Iterate all registrations (participant_applications)
+    regs = query_all("SELECT id, user_id, status FROM participant_applications")
+
+    updated = 0
+    cleared = 0
+
+    for reg in regs:
+        reg_id = str(reg["id"])
+        avg = avg_map.get(reg_id)
+
+        # If no marks => final_score = NULL
+        if not avg or int(avg.get("judge_count") or 0) <= 0:
+            execute("UPDATE participant_applications SET final_score=NULL WHERE id=%s", [reg["id"]])
+            cleared += 1
+            continue
+
+        # base = sum of averages
+        final_score = (
+            _to_float(avg.get("avg_influence")) +
+            _to_float(avg.get("avg_creativity")) +
+            _to_float(avg.get("avg_validity")) +
+            _to_float(avg.get("avg_relevance")) +
+            _to_float(avg.get("avg_presentation"))
+        )
+
+        # Add extra project_meta scores from projects.team_members_json
+        proj = query_one("""
+            SELECT team_members_json
+            FROM projects
+            WHERE participant_id=%s
+        """, [reg["user_id"]])
+
+        team_members_json = proj.get("team_members_json") if proj else None
+        payload = _safe_json(team_members_json, {})
+        meta = (payload.get("project_meta") or {}) if isinstance(payload, dict) else {}
+
+        final_score += _to_float(meta.get("team_work_score"), 0)
+        final_score += _to_float(meta.get("user_experience_score"), 0)
+        final_score += _to_float(meta.get("is_nasa_data_usage_score"), 0)
+        final_score += _to_float(meta.get("is_challenge_category_score"), 0)
+        final_score += _to_float(meta.get("id_project_link_score"), 0)
+        final_score += _to_float(meta.get("is_nasa_global_team_url_score"), 0)
+
+        # 5% bonus if any female member exists
+        if team_members_json and _has_female_member(team_members_json):
+            final_score += (final_score * 5.0) / 100.0
+
+        final_score = round(final_score, 2)
+
+        execute("UPDATE participant_applications SET final_score=%s WHERE id=%s", [final_score, reg["id"]])
+        updated += 1
+
+    return redirect(f"/admin/results?msg=Final scores processed. Updated={updated}, Cleared={cleared}")
+
 
 @login_required
 @role_required("admin")
-def admin_control(req):
-    return _render_admin(
-        req, "App Control", "control",
-        "admin/control/index.html",
-        {"content_block": "App Control page loaded ✅"}
-    )
+def admin_results_export(req):
+    q = req["query"]
+
+    search = (q.get("q") or "").strip()
+    min_score = (q.get("min") or "").strip()
+    max_score = (q.get("max") or "").strip()
+    scored = (q.get("scored") or "").strip()
+
+    where = "WHERE 1=1"
+    params = []
+
+    if scored == "yes":
+        where += " AND pa.final_score IS NOT NULL"
+    elif scored == "no":
+        where += " AND pa.final_score IS NULL"
+
+    if min_score:
+        where += " AND pa.final_score >= %s"
+        params.append(min_score)
+
+    if max_score:
+        where += " AND pa.final_score <= %s"
+        params.append(max_score)
+
+    if search:
+        where += " AND pa.data_json LIKE %s"
+        params.append(f"%{search}%")
+
+    rows = query_all(f"""
+        SELECT pa.id, pa.final_score, pa.data_json
+        FROM participant_applications pa
+        {where}
+        ORDER BY pa.id DESC
+    """, params)
+
+    def safe_json(val):
+        try:
+            return json.loads(val) if val else {}
+        except Exception:
+            return {}
+
+    def csv_escape(s):
+        s = "" if s is None else str(s)
+        s = s.replace('"', '""')
+        return f'"{s}"'
+
+    header = [
+        "registration_id", "final_score",
+        "team_name", "location", "university",
+        "leader_name", "leader_email", "leader_mobile"
+    ]
+    lines = [",".join(header)]
+
+    for r in rows:
+        data = safe_json(r.get("data_json"))
+        line = [
+            csv_escape(r.get("id")),
+            csv_escape(r.get("final_score") if r.get("final_score") is not None else ""),
+            csv_escape(data.get("team_name", "")),
+            csv_escape(data.get("location", "")),
+            csv_escape(data.get("university", "")),
+            csv_escape(data.get("leader_name", "")),
+            csv_escape(data.get("leader_email", "")),
+            csv_escape(data.get("leader_mobile", "")),
+        ]
+        lines.append(",".join(line))
+
+    csv_data = "\n".join(lines)
+    headers = [
+        ("Content-Type", "text/csv; charset=utf-8"),
+        ("Content-Disposition", "attachment; filename=final_results.csv"),
+    ]
+    return "200 OK", headers, [csv_data.encode("utf-8")]
